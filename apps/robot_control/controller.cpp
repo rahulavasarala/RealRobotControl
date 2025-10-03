@@ -21,11 +21,34 @@ using namespace std;
 using namespace Eigen;
 using namespace SaiPrimitives;
 
+void updateRobotState(std::shared_ptr<SaiModel::SaiModel> robot, SaiCommon::RedisClient* redis_client) {
+   VectorXd robot_q = redis_client->getEigen(JOINT_ANGLES_KEY);
+
+   if (robot_q.size() == 7) {
+       robot_q.conservativeResize(9);
+       robot_q.tail(2).setZero();
+   }
+
+   VectorXd robot_dq = redis_client->getEigen(JOINT_VELOCITIES_KEY);
+
+
+   if (robot_dq.size() == 7) {
+       robot_dq.conservativeResize(9);
+       robot_dq.tail(2).setZero();
+   }
+
+
+   robot->setQ(robot_q);
+   robot->setDq(robot_dq);
+   robot->updateModel();
+
+}
+
+
 int main(int argc, char** argv) {
 	// Location of URDF files specifying world and robot information
 	static const string robot_file = std::string(URDF_PATH) + "/panda_arm_gripper.urdf";
-	
-	// start redis client
+
 	auto redis_client = SaiCommon::RedisClient();
 	redis_client.connect();
 
@@ -36,9 +59,7 @@ int main(int argc, char** argv) {
 	// load robots, read current state and update the model
 	auto robot = std::make_shared<SaiModel::SaiModel>(robot_file, false);
 
-	robot->setQ(redis_client.getEigen(JOINT_ANGLES_KEY));
-	robot->setDq(redis_client.getEigen(JOINT_VELOCITIES_KEY));
-	robot->updateModel();
+	updateRobotState(robot, &redis_client);
 
 	auto dof = robot->dof();
 
@@ -74,12 +95,7 @@ int main(int argc, char** argv) {
 		const double time = timer.elapsedSimTime();
 
 		// update robot 
-		robot->setQ(redis_client.getEigen(JOINT_ANGLES_KEY));
-		robot->setDq(redis_client.getEigen(JOINT_VELOCITIES_KEY));
-		Vector3d robot_pos = robot->position(control_link, control_point);
-
-
-		robot->updateModel();
+		updateRobotState(robot, &redis_client);
 
 		// update task model
 		N_prec.setIdentity();
@@ -96,7 +112,6 @@ int main(int argc, char** argv) {
 			std::cout << "control torques: " << control_torques << std::endl;
 			// std::cout << "joint angles: " << redis_client.getEigen(JOINT_ANGLES_KEY) << std::endl;
 			// std::cout << "joint vels: " << redis_client.getEigen(JOINT_VELOCITIES_KEY) << std::endl;
-			std::cout << "robot pos : " << robot_pos << std::endl;
 		}
 
 		loop_count += 1;
