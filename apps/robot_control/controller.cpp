@@ -60,7 +60,14 @@ int main(int argc, char** argv) {
 
 	double control_freq = 1000;
 	SaiCommon::LoopTimer timer(control_freq, 1e6);
-	Vector3d offset = Vector3d(0, 0.3, 0.3);
+	Vector3d offset = Vector3d(0, 0, 0.3);
+
+	Matrix3d custom_orient;
+	custom_orient << 1,0,0,
+					0,-1,0,
+					0,0,-1;
+
+	int loop_count = 0;
 
 	while (runloop) {
 		timer.waitForNextLoop();
@@ -69,19 +76,30 @@ int main(int argc, char** argv) {
 		// update robot 
 		robot->setQ(redis_client.getEigen(JOINT_ANGLES_KEY));
 		robot->setDq(redis_client.getEigen(JOINT_VELOCITIES_KEY));
+		Vector3d robot_pos = robot->position(control_link, control_point);
+
+
 		robot->updateModel();
 
-	
 		// update task model
 		N_prec.setIdentity();
-		motion_force_task->setGoalPosition(offset);
-		motion_force_task->setGoalOrientation(Matrix3d::Identity());
 		motion_force_task->updateTaskModel(N_prec);
-		joint_task->updateTaskModel(motion_force_task->getTaskAndPreviousNullspace());
+
+		motion_force_task->setGoalPosition(offset);
+		motion_force_task->setGoalOrientation(custom_orient);
 
 		control_torques = motion_force_task->computeTorques();
 		// execute redis write callback
 		redis_client.setEigen(JOINT_TORQUES_COMMANDED_KEY, control_torques);
+
+		if (loop_count % 1000 == 0) {
+			std::cout << "control torques: " << control_torques << std::endl;
+			// std::cout << "joint angles: " << redis_client.getEigen(JOINT_ANGLES_KEY) << std::endl;
+			// std::cout << "joint vels: " << redis_client.getEigen(JOINT_VELOCITIES_KEY) << std::endl;
+			std::cout << "robot pos : " << robot_pos << std::endl;
+		}
+
+		loop_count += 1;
 
 	}
 

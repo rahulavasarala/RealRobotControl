@@ -2,8 +2,8 @@ import redis
 import json
 import numpy as np
 
-JOINT_ANGLES_KEY = "sai::sensors::FrankaRobot::joint_velocities"
-JOINT_VELOCITIES_KEY = "sai::sensors::FrankaRobot::joint_positions"
+JOINT_ANGLES_KEY = "sai::sensors::FrankaRobot::joint_positions"
+JOINT_VELOCITIES_KEY = "sai::sensors::FrankaRobot::joint_velocities"
 JOINT_TORQUES_COMMANDED_KEY = "sai::sensors::FrankaRobot::joint_torques"
 FORCE_SENSOR_KEY = "sai::sensors::FrankaRobot::ft_sensor::force"
 MOMENT_SENSOR_KEY = "sai::sensors::FrankaRobot::ft_sensor::torque"

@@ -48,35 +48,6 @@ INCLUDE_DIRECTORIES(${CHAI3D_INCLUDE_DIRS})
 # - hiredis
 find_library(HIREDIS_LIBRARY hiredis REQUIRED)
 
-# - redis plus plus
-# find_library(REDIS_PLUS_PLUS_LIBRARY redis++ REQUIRED)
-
-# - json
-find_package(nlohmann_json 3.11.3 REQUIRED)
-
-# - mujoco
-find_package(mujoco REQUIRED)
-
-# - zmq
-find_library(ZeroMQ_LIBRARY
-    NAMES zmq
-    PATHS /usr/local/lib /opt/homebrew/lib
-    REQUIRED
-)
-
-# - yamlcpp
-find_package(yaml-cpp REQUIRED)
-
-# === Find cppzmq (header-only C++ binding) ===
-find_path(ZeroMQ_INCLUDE_DIR
-    NAMES zmq.h
-    PATHS /usr/local/include /opt/homebrew/include 
-    REQUIRED
-)
-
-include_directories(${ZeroMQ_INCLUDE_DIR})
-
-
 # set reference folders
 add_definitions(-DURDF_PATH=\"${PROJECT_SOURCE_DIR}/models\")
 
@@ -85,9 +56,6 @@ list(APPEND MUJOCO_SAI_COMMON_LIBRARIES
 		${CHAI3D_LIBRARIES}
 		${HIREDIS_LIBRARY}
 		# ${REDIS_PLUS_PLUS_LIBRARY}
-		mujoco::mujoco
-		${ZeroMQ_LIBRARY}
-    yaml-cpp::yaml-cpp
 	)
 
 set (MUJOCO_SAI_CONTROL_BINARY_DIR ${PROJECT_SOURCE_DIR}/bin)
