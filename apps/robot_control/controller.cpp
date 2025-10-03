@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
 		motion_force_task->updateTaskModel(N_prec);
 		joint_task->updateTaskModel(motion_force_task->getTaskAndPreviousNullspace());
 
-		control_torques = motion_force_task->getTorques();
+		control_torques = motion_force_task->computeTorques();
 		// execute redis write callback
 		redis_client.setEigen(JOINT_TORQUES_COMMANDED_KEY, control_torques);
 
