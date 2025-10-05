@@ -16,6 +16,7 @@ void sighandler(int){runloop = false;}
 #include <iostream>
 #include <string>
 #include "redis_keys.h"
+#include <cmath>
 
 using namespace std;
 using namespace Eigen;
@@ -81,7 +82,9 @@ int main(int argc, char** argv) {
 
 	double control_freq = 1000;
 	SaiCommon::LoopTimer timer(control_freq, 1e6);
-	Vector3d offset = Vector3d(0, 0, 0.3);
+	Vector3d offset = Vector3d(0.3, 0, 0.3);
+	double radius = 0.05;
+	double frequency = 0.2; //Revolutions/second
 
 	Matrix3d custom_orient;
 	custom_orient << 1,0,0,
@@ -101,7 +104,9 @@ int main(int argc, char** argv) {
 		N_prec.setIdentity();
 		motion_force_task->updateTaskModel(N_prec);
 
-		motion_force_task->setGoalPosition(offset);
+		Vector3d goal_position = offset + Vector3d(radius * std::cos((2 * M_PI/1000) * frequency * loop_count), radius * std::sin((2 * M_PI/1000) * frequency * loop_count), 0);
+
+		motion_force_task->setGoalPosition(goal_position);
 		motion_force_task->setGoalOrientation(custom_orient);
 
 		control_torques = motion_force_task->computeTorques();
