@@ -22,10 +22,12 @@ using namespace std;
 using namespace Eigen;
 using namespace SaiPrimitives;
 
+bool real_robot = false;
+
 void updateRobotState(std::shared_ptr<SaiModel::SaiModel> robot, SaiCommon::RedisClient* redis_client) {
    VectorXd robot_q = redis_client->getEigen(JOINT_ANGLES_KEY);
 
-   if (robot_q.size() == 7) {
+   if (real_robot) {
        robot_q.conservativeResize(9);
        robot_q.tail(2).setZero();
    }
@@ -33,7 +35,7 @@ void updateRobotState(std::shared_ptr<SaiModel::SaiModel> robot, SaiCommon::Redi
    VectorXd robot_dq = redis_client->getEigen(JOINT_VELOCITIES_KEY);
 
 
-   if (robot_dq.size() == 7) {
+   if (real_robot) {
        robot_dq.conservativeResize(9);
        robot_dq.tail(2).setZero();
    }
@@ -43,6 +45,20 @@ void updateRobotState(std::shared_ptr<SaiModel::SaiModel> robot, SaiCommon::Redi
    robot->setDq(robot_dq);
    robot->updateModel();
 
+}
+
+void figure_real_robot(SaiCommon::RedisClient* redis_client) {
+
+	//decide whether the real robot is true or false
+
+	VectorXd robot_q = redis_client->getEigen(JOINT_ANGLES_KEY);
+
+	if (robot_q.size() == 7) {
+		real_robot = true;
+	}
+
+	std::cout << "Robot control mode is: " << real_robot << std::endl;
+	
 }
 
 
@@ -59,6 +75,8 @@ int main(int argc, char** argv) {
 
 	// load robots, read current state and update the model
 	auto robot = std::make_shared<SaiModel::SaiModel>(robot_file, false);
+
+	figure_real_robot(&redis_client);
 
 	updateRobotState(robot, &redis_client);
 
@@ -82,7 +100,7 @@ int main(int argc, char** argv) {
 
 	double control_freq = 1000;
 	SaiCommon::LoopTimer timer(control_freq, 1e6);
-	Vector3d offset = Vector3d(0.3, 0, 0.3);
+	Vector3d offset = Vector3d(0.4, 0, 0.3);
 	double radius = 0.05;
 	double frequency = 0.2; //Revolutions/second
 
@@ -105,16 +123,21 @@ int main(int argc, char** argv) {
 		motion_force_task->updateTaskModel(N_prec);
 
 		Vector3d goal_position = offset + Vector3d(radius * std::cos((2 * M_PI/1000) * frequency * loop_count), radius * std::sin((2 * M_PI/1000) * frequency * loop_count), 0);
-
+		// goal_position = offset;
 		motion_force_task->setGoalPosition(goal_position);
 		motion_force_task->setGoalOrientation(custom_orient);
 
 		control_torques = motion_force_task->computeTorques();
 		// execute redis write callback
+
+		if (real_robot) {
+			control_torques.conservativeResize(control_torques.size() - 2);
+		}
+
 		redis_client.setEigen(JOINT_TORQUES_COMMANDED_KEY, control_torques);
 
 		if (loop_count % 1000 == 0) {
-			std::cout << "control torques: " << control_torques << std::endl;
+			// std::cout << "control torques: " << control_torques << std::endl;
 			// std::cout << "joint angles: " << redis_client.getEigen(JOINT_ANGLES_KEY) << std::endl;
 			// std::cout << "joint vels: " << redis_client.getEigen(JOINT_VELOCITIES_KEY) << std::endl;
 		}
