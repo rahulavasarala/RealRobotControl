@@ -35,12 +35,14 @@ VectorXd robot_dq;
 VectorXd control_torques;
 VectorXd sensed_force;
 VectorXd sensed_torque;
+Vector3d control_point_pos;
+VectorXd control_point_orient;
 
 class VectorBuffer {
 public:
     VectorBuffer(int size, int dimension) 
         : max_size_(size), 
-          current_sum_(VectorType::Zero(dimension)), 
+          current_sum_(VectorXd::Zero(dimension)), 
           dimension_(dimension) 
     {
         if (size <= 0 || dimension <= 0) {
@@ -88,13 +90,13 @@ private:
 
 void init_keys( SaiCommon::RedisClient* redis_client) {
     //Set all the stuff to 
-    target_pos = Vector3d(0.3, 0.3,0.3);
+    target_pos = Vector3d(0.3, 0,0.3);
     target_orient.resize(4);
     target_orient << 0, 1,0,0;
 
     motion_force_axis.resize(4);
-    motion_force_axis << 1,0,0,1;
-    desired_force = Vector3d(1,0,0);
+    motion_force_axis << 0,0,0,0;
+    desired_force = Vector3d(0,0,0);
 
     control_point_pos.resize(3);
     control_point_pos << 0,0,0;
@@ -132,6 +134,9 @@ void set_send_receive_keys(SaiCommon::RedisClient* redis_client) {
     redis_client->addToReceiveGroup(TARGET_ORIENT, target_orient);
     redis_client->addToReceiveGroup(DESIRED_FORCE, desired_force); 
     redis_client->addToSendGroup(JOINT_TORQUES_COMMANDED_KEY, control_torques);
+    redis_client->addToReceiveGroup(FORCE_SENSOR_KEY, sensed_force);
+    redis_client->addToReceiveGroup(MOMENT_SENSOR_KEY, sensed_torque);
+
 }
 
 void updateControlPointValues(std::shared_ptr<SaiPrimitives::MotionForceTask> motion_force_task, SaiCommon::RedisClient* redis_client) {
@@ -190,7 +195,7 @@ int main(int argc, char** argv) {
 	// Location of URDF files specifying world and robot information
 	static const string robot_file = std::string(URDF_PATH) + "/panda_arm_gripper.urdf";
 
-    auto force_torque_buffer = Buffer(50);
+    auto force_torque_buffer = VectorBuffer(50, 6);
 
     auto redis_client = SaiCommon::RedisClient();
 	redis_client.connect();
