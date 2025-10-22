@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
 	MatrixXd N_prec = MatrixXd::Identity(dof, dof);
 
 	const string control_link = "link7";
-	const Vector3d control_point = Vector3d(0, 0, 0.35);
+	const Vector3d control_point = Vector3d(0, 0, 0.28);
 	Affine3d compliant_frame = Affine3d::Identity();
 	compliant_frame.translation() = control_point;
 	auto motion_force_task = std::make_shared<SaiPrimitives::MotionForceTask>(robot, control_link, compliant_frame);

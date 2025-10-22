@@ -123,38 +123,42 @@
 	<link name="link7">
 		<inertial>
 			<origin xyz="0 0 0.17" rpy="0 -0 0" />
-			<mass value="1.8" />
-			<inertia ixx="0.09" iyy="0.05" izz="0.07" ixy="0" ixz="0" iyz="0" />
+			<mass value="0.627143"/>
+      		<inertia ixx="0.00021092389150104718" ixy="-2.433299114461931e-05" ixz="4.564480393778983e-05" iyy="0.00017718568002411474" iyz="8.744070223226438e-05" izz="5.993190599659971e-05"/>
 		</inertial>
 		<visual>
 			<geometry>
 				<mesh filename="meshes/visual/link7.obj"/>
 			</geometry>
 		</visual>
-		<!-- <collision>
-			<geometry>
-				<mesh filename="meshes/collision/link7.obj"/>
-			</geometry>
-		</collision> -->
+
+		
+	</link>
+	<link name="force-sensor">
+		<inertial>
+			<origin xyz="0 0 0" rpy="0 -0 0" />
+			<mass value="0.255" />
+			<inertia ixx="0.01" iyy="0.01" izz="0.01" ixy="0" ixz="0" iyz="0" />
+		</inertial>
+
 		<visual>
-			<origin xyz="0 0 0.107" rpy="0 0 -0.78539816339" />
+			<origin xyz="0 0 0" rpy="0 0 0" />
+
+			<geometry>
+				<cylinder radius="0.0375" length="0.0375" />
+			</geometry>
+
+			<material name="blue_sensor">
+				<color rgba="0 0 0.8 1.0" />
+			</material>
+		</visual>
+
+		<visual>
+			<origin xyz="0 0 0.03" rpy="0 0 -0.78539816339" />
 			<geometry>
 				<mesh filename="meshes/visual/hand.obj"/>
 			</geometry>
 		</visual>
-		<!-- <collision>
-			<origin xyz="0 0 0.107" rpy="0 0 -0.78539816339" />
-			<geometry>
-				<mesh filename="meshes/collision/hand.obj"/>
-			</geometry>
-		</collision> -->
-	</link>
-	<link name="end-effector">
-		<inertial>
-			<origin xyz="0 0 0" rpy="0 -0 0" />
-			<mass value="0.05" />
-			<inertia ixx="0.01" iyy="0.01" izz="0.01" ixy="0" ixz="0" iyz="0" />
-		</inertial>
 	</link>
 
     <link name="leftfinger">
@@ -168,11 +172,7 @@
 				<mesh filename="meshes/visual/finger.obj"/>
 			</geometry>
 		</visual>
-		<!-- <collision>
-			<geometry>
-				<mesh filename="meshes/collision/finger.obj"/>
-			</geometry>
-		</collision> -->
+		
 		<collision>
 			<origin xyz="0 0.0025 0.046" rpy="1.57079632679 -0 0" />
 			<geometry>
@@ -191,11 +191,6 @@
 				<mesh filename="meshes/visual/finger.obj"/>
 			</geometry>
 		</visual>
-		<!-- <collision>
-			<geometry>
-				<mesh filename="meshes/collision/finger.obj"/>
-			</geometry>
-		</collision> -->
 		<collision>
 			<origin xyz="0 0.0025 0.046" rpy="1.57079632679 -0 0" />
 			<geometry>
@@ -265,16 +260,15 @@
 		<axis xyz="0 0 1"/>
 		<limit effort="12" lower="-2.8973" upper="2.8973" velocity="2.6100"/>
 	</joint>
-	<joint name="joint_ee" type="fixed">
-		<origin rpy="0 0 0" xyz="0 0 0.212"/>
+	<joint name="joint_force_sensor" type="fixed">
+		<origin rpy="0 0 0" xyz="0 0 0.12"/>
 		<parent link="link7"/>
-		<child link="end-effector"/>
+		<child link="force-sensor"/>
 	</joint>
-
     <joint name="finger_joint1" type="prismatic">
 		<parent link="link7"/>
 		<child link="leftfinger"/>
-		<origin xyz="0 0 0.1654" rpy="0 0 -0.78539816339"/>
+		<origin xyz="0 0 0.21" rpy="0 0 -0.78539816339"/>
 		<axis xyz="0 1 0"/>
 		<calibration rising="0.02" />
 		<limit effort="20" lower="0.0" upper="0.04" velocity="0.2"/>
@@ -282,7 +276,7 @@
     <joint name="finger_joint2" type="prismatic">
 		<parent link="link7"/>
 		<child link="rightfinger"/>
-		<origin xyz="0 0 0.1654" rpy="0 0 2.35619449019"/>
+		<origin xyz="0 0 0.21" rpy="0 0 2.35619449019"/>
 		<axis xyz="0 1 0"/>
 		<calibration rising="0.02" />
 		<limit effort="20" lower="0.0" upper="0.04" velocity="0.2"/>
