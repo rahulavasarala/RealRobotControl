@@ -90,7 +90,7 @@ private:
 
 void init_keys( SaiCommon::RedisClient* redis_client) {
     //Set all the stuff to 
-    target_pos = Vector3d(0.3, 0,0.3);
+    target_pos = Vector3d(0.4, 0,0.4);
     target_orient.resize(4);
     target_orient << 0, 1,0,0;
 
@@ -188,7 +188,7 @@ void compute_joint_torques(std::shared_ptr<SaiModel::SaiModel> robot,
 
     motion_force_task->updateTaskModel(MatrixXd::Identity(robot->dof(), robot->dof()));
     joint_task->updateTaskModel(motion_force_task->getTaskAndPreviousNullspace());
-    control_torques = motion_force_task->computeTorques() + joint_task->computeTorques() + robot->jointGravityVector();
+    control_torques = motion_force_task->computeTorques() + joint_task->computeTorques();
 }
 
 int main(int argc, char** argv) {
@@ -259,7 +259,8 @@ int main(int argc, char** argv) {
         redis_client.setEigen(JOINT_TORQUES_COMMANDED_KEY, control_torques);
 
 		if (loop_count % 1000 == 0) {
-			std::cout << "control torques: " << control_torques << std::endl;
+			// std::cout << "control torques: " << control_torques << std::endl;
+            std::cout << "Norm of distance between target point and control point: " << (target_pos - motion_force_task->getCurrentPosition()).norm() << std::endl;
 		}
 
 		loop_count += 1;
