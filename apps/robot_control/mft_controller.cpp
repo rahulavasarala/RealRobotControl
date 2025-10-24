@@ -38,6 +38,9 @@ VectorXd sensed_torque;
 Vector3d control_point_pos;
 VectorXd control_point_orient;
 
+//I need to have a period where I calibrate the force sensors for value tearing, which is neccessary for the force sensor
+//values
+
 class VectorBuffer {
 public:
     VectorBuffer(int size, int dimension) 
@@ -92,7 +95,7 @@ void init_keys( SaiCommon::RedisClient* redis_client) {
     //Set all the stuff to 
     target_pos = Vector3d(0.4, 0,0.4);
     target_orient.resize(4);
-    target_orient << 0, 1,0,0;
+    target_orient << 1, 0,0,0;
 
     motion_force_axis.resize(4);
     motion_force_axis << 0,0,0,0;
@@ -261,6 +264,9 @@ int main(int argc, char** argv) {
 		if (loop_count % 1000 == 0) {
 			// std::cout << "control torques: " << control_torques << std::endl;
             std::cout << "Norm of distance between target point and control point: " << (target_pos - motion_force_task->getCurrentPosition()).norm() << std::endl;
+            // std::cout << "Norm of distance between target point and control point: " <<  << std::endl;
+
+            // std::cout << "sensed_force: " << sensed_force << std::endl;
 		}
 
 		loop_count += 1;

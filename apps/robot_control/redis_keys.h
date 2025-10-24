@@ -5,7 +5,7 @@ const std::string JOINT_VELOCITIES_KEY = "sai::sensors::FrankaRobot::joint_veloc
 const std::string JOINT_TORQUES_COMMANDED_KEY = "sai::commands::FrankaRobot::control_torques";
 
 const std::string FORCE_SENSOR_KEY = "sai::sensors::FrankaRobot::ft_sensor::end-effector::force";
-const std::string MOMENT_SENSOR_KEY = "sai::sensors::FrankaRobot::ft_sensor::end-effector::torque";
+const std::string MOMENT_SENSOR_KEY = "sai::sensors::FrankaRobot::ft_sensor::end-effector::moment";
 
 const std::string SMOOTHED_FORCE = "sai::sensors::FrankaRobot::ft_sensor::smoothed_force";
 const std::string SMOOTHED_TORQUE = "sai::sensors::FrankaRobot::ft_sensor::smoothed_torque";
