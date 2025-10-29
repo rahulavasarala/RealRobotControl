@@ -52,7 +52,7 @@ void simulation(std::shared_ptr<SaiSimulation::SaiSimulation> sim);
 
 int main() {
 	SaiModel::URDF_FOLDERS["URDF_FOLDER"] = std::string(URDF_PATH);
-	static const string robot_file = std::string(URDF_PATH) + "/panda_arm_gripper.urdf";
+	static const string robot_file = std::string(URDF_PATH) + "/panda_arm.urdf";
 	static const string world_file = std::string(URDF_PATH) + "/world.urdf";
 	std::cout << "Loading URDF world model file: " << world_file << endl;
 

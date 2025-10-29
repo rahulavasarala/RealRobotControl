@@ -22,9 +22,6 @@ using namespace std;
 using namespace Eigen;
 using namespace SaiPrimitives;
 
-//initialize all the vectors that talk to redis over here
-bool sim = true;
-
 Vector3d target_pos;
 VectorXd target_orient;
 VectorXd motion_force_axis;
@@ -112,15 +109,8 @@ void init_keys( SaiCommon::RedisClient* redis_client) {
     sensed_torque.resize(3);
     sensed_torque << 0,0,0;
 
-    if (sim) {
-        robot_q = VectorXd::Zero(9);
-        robot_dq = VectorXd::Zero(9);
-    } else {
-        robot_q = VectorXd::Zero(7);
-        robot_dq = VectorXd::Zero(7);
-    }
-    control_torques.resize(9);
-    control_torques = VectorXd::Zero(9);
+    control_torques.resize(7);
+    control_torques = VectorXd::Zero(7);
 
     redis_client->setEigen(MOTION_FORCE_AXIS, motion_force_axis);
     redis_client->setEigen(DESIRED_FORCE, desired_force);
@@ -129,18 +119,6 @@ void init_keys( SaiCommon::RedisClient* redis_client) {
     
 }
 
-void set_send_receive_keys(SaiCommon::RedisClient* redis_client) {
-    redis_client->addToReceiveGroup(JOINT_ANGLES_KEY, robot_q);
-    redis_client->addToReceiveGroup(JOINT_VELOCITIES_KEY, robot_dq);
-    redis_client->addToReceiveGroup(MOTION_FORCE_AXIS, motion_force_axis);
-    redis_client->addToReceiveGroup(TARGET_POS, target_pos);
-    redis_client->addToReceiveGroup(TARGET_ORIENT, target_orient);
-    redis_client->addToReceiveGroup(DESIRED_FORCE, desired_force); 
-    redis_client->addToSendGroup(JOINT_TORQUES_COMMANDED_KEY, control_torques);
-    redis_client->addToReceiveGroup(FORCE_SENSOR_KEY, sensed_force);
-    redis_client->addToReceiveGroup(MOMENT_SENSOR_KEY, sensed_torque);
-
-}
 
 void updateControlPointValues(std::shared_ptr<SaiPrimitives::MotionForceTask> motion_force_task, SaiCommon::RedisClient* redis_client) {
 
@@ -150,6 +128,9 @@ void updateControlPointValues(std::shared_ptr<SaiPrimitives::MotionForceTask> mo
 }
 
 void update_smoothed_force_torque(VectorBuffer* buffer, SaiCommon::RedisClient* redis_client) {
+
+    sensed_force = redis_client->getEigen(FORCE_SENSOR_KEY);
+    sensed_torque = redis_client->getEigen(MOMENT_SENSOR_KEY);
 
     VectorXd sensed_force_torque(sensed_force.size() + sensed_torque.size());
 
@@ -164,17 +145,27 @@ void update_smoothed_force_torque(VectorBuffer* buffer, SaiCommon::RedisClient* 
     redis_client->setEigen(SMOOTHED_TORQUE, average_torque);
 }
 
-void updateRobotState(std::shared_ptr<SaiModel::SaiModel> robot) {
+void updateRobotState(std::shared_ptr<SaiModel::SaiModel> robot, SaiCommon::RedisClient* redis_client) {
+    // Assuming robot_q and robot_dq are Eigen::VectorXd variables defined elsewhere
+    robot_q = redis_client->getEigen(JOINT_ANGLES_KEY);  // make a copy
+    robot_dq = redis_client->getEigen(JOINT_VELOCITIES_KEY);
+    
 
-   robot->setQ(robot_q);
-   robot->setDq(robot_dq);
-   robot->updateModel();
-
+    robot->setQ(robot_q);
+    robot->setDq(robot_dq);
+    robot->updateModel();
 }
 
 void compute_joint_torques(std::shared_ptr<SaiModel::SaiModel> robot, 
     std::shared_ptr<SaiPrimitives::MotionForceTask> motion_force_task, 
-    std::shared_ptr<SaiPrimitives::JointTask> joint_task) {
+    std::shared_ptr<SaiPrimitives::JointTask> joint_task, SaiCommon::RedisClient* redis_client) {
+
+    target_pos = redis_client->getEigen(TARGET_POS);
+    target_orient = redis_client->getEigen(TARGET_ORIENT);
+    desired_force = redis_client->getEigen(DESIRED_FORCE);
+    motion_force_axis = redis_client->getEigen(MOTION_FORCE_AXIS);
+
+    
 
     motion_force_task->setGoalForce(desired_force);
     int force_dim = static_cast<int>(motion_force_axis[3]);
@@ -194,9 +185,53 @@ void compute_joint_torques(std::shared_ptr<SaiModel::SaiModel> robot,
     control_torques = motion_force_task->computeTorques() + joint_task->computeTorques();
 }
 
+int parse_args(int argc, char* argv[]) {
+    if (argc != 2) {
+        cerr << "Incorrect number of command line arguments.\n";
+        cerr << "Expected usage: ./controller {0|1}\n";
+        return -1;
+    }
+
+    string arg = argv[1];
+    int controller_number;
+
+    try {
+        size_t pos;
+        controller_number = stoi(arg, &pos);
+
+        // Check for extra characters after the number
+        if (pos < arg.size()) {
+            cerr << "Trailing characters after number: " << arg << '\n';
+            return -1;
+        }
+
+        // Validate only 0 or 1 are acceptable
+        if (controller_number != 0 && controller_number != 1) {
+            cerr << "Invalid controller number: must be 0 or 1.\n";
+            return -1;
+        }
+
+    } catch (const invalid_argument&) {
+        cerr << "Invalid number format: " << arg << '\n';
+        return -1;
+    } catch (const out_of_range&) {
+        cerr << "Number out of range: " << arg << '\n';
+        return -1;
+    }
+
+    return controller_number;
+}
+
 int main(int argc, char** argv) {
+
+    int controller_number = parse_args(argc, argv);
+
+    if (controller_number == -1) {
+        // Parsing failed; exit with error code
+        return 1;
+    }
 	// Location of URDF files specifying world and robot information
-	static const string robot_file = std::string(URDF_PATH) + "/panda_arm_gripper.urdf";
+	static const string robot_file = std::string(URDF_PATH) + "/panda_arm.urdf";
 
     auto force_torque_buffer = VectorBuffer(50, 6);
 
@@ -208,14 +243,11 @@ int main(int argc, char** argv) {
 	signal(SIGINT, &sighandler);
 
     init_keys(&redis_client);
-    set_send_receive_keys(&redis_client);
-
-    redis_client.receiveAllFromGroup();
 
 	// load robots, read current state and update the model
 	auto robot = std::make_shared<SaiModel::SaiModel>(robot_file, false);
 
-	updateRobotState(robot);
+	updateRobotState(robot,&redis_client);
 
 	auto dof = robot->dof();
 
@@ -223,12 +255,12 @@ int main(int argc, char** argv) {
 	MatrixXd N_prec = MatrixXd::Identity(dof, dof);
 
 	const string control_link = "link7";
-	const Vector3d control_point = Vector3d(0, 0, 0.28);
+	const Vector3d control_point = Vector3d(0, 0, 0.25);
 	Affine3d compliant_frame = Affine3d::Identity();
 	compliant_frame.translation() = control_point;
 	auto motion_force_task = std::make_shared<SaiPrimitives::MotionForceTask>(robot, control_link, compliant_frame);
-	motion_force_task->setPosControlGains(400, 40, 0);
-	motion_force_task->setOriControlGains(400, 40, 0);
+	motion_force_task->setPosControlGains(400, 20, 0);
+	motion_force_task->setOriControlGains(400, 20, 0);
 
 	auto joint_task = std::make_shared<SaiPrimitives::JointTask>(robot);
 	joint_task->setGains(400, 40, 0);
@@ -243,11 +275,8 @@ int main(int argc, char** argv) {
 		timer.waitForNextLoop();
 		const double time = timer.elapsedSimTime();
 
-        //recieve all the redis keys
-        redis_client.receiveAllFromGroup();
-
 		// update robot 
-		updateRobotState(robot);
+		updateRobotState(robot, &redis_client);
 
         update_smoothed_force_torque(&force_torque_buffer, &redis_client);
 
@@ -257,13 +286,18 @@ int main(int argc, char** argv) {
 		N_prec.setIdentity();
 		motion_force_task->updateTaskModel(N_prec);
 
-        compute_joint_torques(robot, motion_force_task, joint_task);
+        compute_joint_torques(robot, motion_force_task, joint_task, &redis_client);
 
-        redis_client.setEigen(JOINT_TORQUES_COMMANDED_KEY, control_torques);
+        VectorXd final_torques = control_torques;
+
+        if (controller_number == 1) {
+            redis_client.setEigen(JOINT_TORQUES_COMMANDED_KEY, final_torques);
+        }
+        
 
 		if (loop_count % 1000 == 0) {
-			// std::cout << "control torques: " << control_torques << std::endl;
-            std::cout << "Norm of distance between target point and control point: " << (target_pos - motion_force_task->getCurrentPosition()).norm() << std::endl;
+			std::cout << "control torques: " << control_torques << std::endl;
+            // std::cout << "Norm of distance between target point and control point: " << (target_pos - motion_force_task->getCurrentPosition()).norm() << std::endl;
             // std::cout << "Norm of distance between target point and control point: " <<  << std::endl;
 
             // std::cout << "sensed_force: " << sensed_force << std::endl;

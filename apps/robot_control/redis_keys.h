@@ -22,5 +22,6 @@ const std::string TARGET_ORIENT = "sai::sensors::FrankaRobot::target_orient";
 const std::string CONTROL_POINT_ORIENT = "sai::sensors::FrankaRobot::control_point_orient";
 const std::string CONTROL_POINT_POS = "sai::sensors::FrankaRobot::control_point_pos";
 const std::string CONTROL_POINT_VEL = "sai::sensors::FrankaRobot::control_point_vel";
+const std::string MASS_MATRIX = "sai::sensors::FrankaRobot::mass_matrix";
 
 
