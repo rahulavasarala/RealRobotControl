@@ -143,6 +143,7 @@ void update_smoothed_force_torque(VectorBuffer* buffer, SaiCommon::RedisClient* 
 
     redis_client->setEigen(SMOOTHED_FORCE, average_force);
     redis_client->setEigen(SMOOTHED_TORQUE, average_torque);
+    redis_client->setEigen(FORCE_TORQUE_KEY, sensed_force_torque); 
 }
 
 void updateRobotState(std::shared_ptr<SaiModel::SaiModel> robot, SaiCommon::RedisClient* redis_client) {
@@ -154,6 +155,8 @@ void updateRobotState(std::shared_ptr<SaiModel::SaiModel> robot, SaiCommon::Redi
     robot->setQ(robot_q);
     robot->setDq(robot_dq);
     robot->updateModel();
+
+    redis_client->setEigen(MASS_MATRIX, robot->M());
 }
 
 void compute_joint_torques(std::shared_ptr<SaiModel::SaiModel> robot, 

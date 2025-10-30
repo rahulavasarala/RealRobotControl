@@ -3,7 +3,7 @@
 <world name="demo_world" gravity="0.0 0.0 -9.81">
 
 	<robot name="panda_arm_gripper">
-		<model dir="/home/hb1/OpenSai/RealRobotControl/models" path="panda_arm.urdf" name="panda_arm_gripper" />
+		<model dir="/Users/rahulavasarala/Desktop/OpenSai/RealRobotControl/models" path="panda_arm.urdf" name="panda_arm_gripper" />
 		<origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
 	</robot>
 

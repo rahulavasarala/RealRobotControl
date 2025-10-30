@@ -9,15 +9,18 @@
  * 
  */
 
-#include "Sai2Model.h"
+#include "SaiModel.h"
 #include "redis/RedisClient.h"
 #include "timer/LoopTimer.h"
-#include "Sai2Primitives.h"
+#include "SaiPrimitives.h"
+
+#include <fstream>
+#include <tinyxml2.h>
 
 #include <iostream>
 #include <string>
-#include <fstream>
-#include <tinyxml2.h>
+#include "redis_keys.h"
+#include <cmath>
 
 #include <signal.h>
 bool runloop = true;
@@ -29,29 +32,12 @@ using namespace Eigen;
 using Vector6d = Eigen::Matrix<double, 6, 1>;
 using Vector7d = Eigen::Matrix<double, 7, 1>;
 
-const string iiwa7_file = "./resources/iiwa7.urdf";
-const string iiwa14_file = "./resources/iiwa14.urdf";
-const string panda_file = "./resources/panda_arm.urdf";
+const string panda_file = std::string(URDF_PATH) + "/panda_arm.urdf";
 const string robot_name = "panda_arm";  // iiwa7 or iiwa14 or panda_arm
 const string force_sensor_name = "ati";  // opto or ati
-const string bias_fname = "../../calibration/bias_measurement.xml";
+const string bias_fname = "/Users/rahulavasarala/Desktop/OpenSai/RealRobotControl/calibration/bias_measurement.xml";
 
-// redis keys:
-// - read:
-string JOINT_ANGLES_KEY;
-string JOINT_VELOCITIES_KEY;
-
-// - write
-string JOINT_TORQUES_COMMANDED_KEY;
-string CONTROLLER_RUNNING_KEY;
-
-// - model 
-string MASSMATRIX_KEY;
-string CORIOLIS_KEY;
-string ROBOT_GRAVITY_KEY;
-
-// - force sensor
-string FORCE_SENSOR_KEY;
+string CONTROLLER_RUNNING_KEY = "sai::sensors::FrankaRobot::controller";
 
 unsigned long long controller_counter = 0;
 const bool inertia_regularization = true;
@@ -81,12 +67,7 @@ int sign(double value) {
 int main() {
 
 	Vector7d q0, q1, q2, q3, q4, q5;
-	if (robot_name == "iiwa7" || robot_name == "iiwa14") {
-		q0 << 0, -30, 0, 60, -90, -90, 0;
-		q1 << 0, -30, 0, 60, -90, -90, 90;
-		q2 << 0, -30, 0, 60, 90, -90, 0;
-		q3 << 0, -30, 0, 60, 90, -90, 90;
-	} else if (robot_name == "panda_arm") {
+	if (robot_name == "panda_arm") {
 		q0 << 90, 0, 0, -90, 0, 180, -90;  // + y
 		q1 << 90, 0, 0, -90, 0, 180, 0;  // + x
 		q2 << 90, 0, 0, -90, 0, 180, 90;  // - y
@@ -96,64 +77,8 @@ int main() {
 
 	std::vector<Vector7d> calib_config = { (M_PI / 180) * q0, (M_PI / 180) * q1, (M_PI / 180) * q2, (M_PI / 180) * q3, (M_PI / 180) * q4 };
 
-	if (flag_simulation == true) {
-		if (robot_name == "iiwa7") {
-			JOINT_ANGLES_KEY = "sai2::sim::dual_arm::iiwa7::sensors::q";
-			JOINT_VELOCITIES_KEY = "sai2::sim::dual_arm::iiwa7::sensors::dq";
-			JOINT_TORQUES_COMMANDED_KEY = "sai2::sim::dual_arm::iiwa7::actuators::fgc";
-			CONTROLLER_RUNNING_KEY = "sai2::sim::dual_arm::iiwa7::controller";
-		} else if (robot_name == "iiwa14") {
-			JOINT_ANGLES_KEY = "sai2::sim::dual_arm::iiwa14::sensors::q";
-			JOINT_VELOCITIES_KEY = "sai2::sim::dual_arm::iiwa14::sensors::dq";
-			JOINT_TORQUES_COMMANDED_KEY = "sai2::sim::dual_arm::iiwa14::actuators::fgc";
-			CONTROLLER_RUNNING_KEY = "sai2::sim::dual_arm::iiwa14::controller";
-		} else if (robot_name == "iiwa14") {
-			JOINT_ANGLES_KEY = "sai2::sim::dual_arm::iiwa14::sensors::q";
-			JOINT_VELOCITIES_KEY = "sai2::sim::dual_arm::iiwa14::sensors::dq";
-			JOINT_TORQUES_COMMANDED_KEY = "sai2::sim::dual_arm::iiwa14::actuators::fgc";
-			CONTROLLER_RUNNING_KEY = "sai2::sim::dual_arm::iiwa14::controller";
-		} else {
-			throw runtime_error("Invalid robot name");
-		}
-	} else {
-		if (robot_name == "iiwa7") {
-			JOINT_ANGLES_KEY = "sai2::KUKA_IIWA::sensors::q";
-			JOINT_VELOCITIES_KEY = "sai2::KUKA_IIWA::sensors::dq";
-			JOINT_TORQUES_COMMANDED_KEY = "sai2::KUKA_IIWA::actuators::fgc";
-			CONTROLLER_RUNNING_KEY = "sai2::KUKA_IIWA::controller";
-			MASSMATRIX_KEY = "sai2::KUKA_IIWA::model::massmatrix";
-			CORIOLIS_KEY = "sai2::KUKA_IIWA::model::coriolis";
-			ROBOT_GRAVITY_KEY = "sai2::KUKA_IIWA::model::gravity";
-		} else if (robot_name == "iiwa14") {
-			JOINT_ANGLES_KEY = "sai2::iiwa14::sensors::q";
-			JOINT_VELOCITIES_KEY = "sai2::iiwa14::sensors::dq";
-			JOINT_TORQUES_COMMANDED_KEY = "sai2::iiwa14::actuators::fgc";
-			CONTROLLER_RUNNING_KEY = "sai2::iiwa14::controller";
-			MASSMATRIX_KEY = "sai2::iiwa14::model::massmatrix";
-			CORIOLIS_KEY = "sai2::iiwa14::model::coriolis";
-			ROBOT_GRAVITY_KEY = "sai2::iiwa14::model::gravity";
-		} else if (robot_name == "panda_arm") {
-			JOINT_ANGLES_KEY = "sai2::FrankaPanda::Romeo::sensors::q";
-			JOINT_VELOCITIES_KEY = "sai2::FrankaPanda::Romeo::sensors::dq";
-			JOINT_TORQUES_COMMANDED_KEY = "sai2::FrankaPanda::Romeo::actuators::fgc";
-			CONTROLLER_RUNNING_KEY = "sai2::FrankaPanda::Romeo::actuators::controller";
-			MASSMATRIX_KEY = "sai2::FrankaPanda::Romeo::sensors::model::massmatrix";
-		} else { 
-			throw runtime_error("Invalid robot name");
-		}
-
-		if (force_sensor_name == "opto") {
-			FORCE_SENSOR_KEY = "sai2::optoforceSensor::6Dsensor::force";
-		} else if (force_sensor_name == "ati") {
-			// FORCE_SENSOR_KEY = "sai2::ATIGamma_Sensor::iiwa14::force_torque";
-			FORCE_SENSOR_KEY = "sai2::ATIGamma_Sensor::Romeo::force_torque";
-		} else {
-			throw runtime_error("Invalid force sensor name");
-		}
-	}
-
 	// start redis client
-	auto redis_client = Sai2Common::RedisClient();
+	auto redis_client = SaiCommon::RedisClient();
 	redis_client.connect();
 
 	redis_client.set(CONTROLLER_RUNNING_KEY, "0");
@@ -165,13 +90,8 @@ int main() {
 
 	// load robot
 	Affine3d T_robot = Affine3d::Identity();
-	string robot_file = iiwa7_file;
-	if (robot_name == "iiwa14") {
-		robot_file = iiwa14_file;
-	} else if (robot_name == "panda_arm") {
-		robot_file = panda_file;
-	}
-	auto robot = std::make_shared<Sai2Model::Sai2Model>(robot_file);
+	string robot_file = panda_file;
+	auto robot = std::make_shared<SaiModel::SaiModel>(robot_file);
 	robot->setQ(redis_client.getEigen(JOINT_ANGLES_KEY));
 	robot->setDq(redis_client.getEigen(JOINT_VELOCITIES_KEY));
 	robot->updateModel();
@@ -186,12 +106,8 @@ int main() {
 
 	// ***************** //
 	// joint (posture) task
-	auto joint_task = std::make_shared<Sai2Primitives::JointTask>(robot);
+	auto joint_task = std::make_shared<SaiPrimitives::JointTask>(robot);
 	VectorXd max_velocity(7);
-	if (robot_name == "iiwa7" || robot_name == "iiwa14") {
-		max_velocity << M_PI/6, M_PI/6, M_PI/6, M_PI/6, M_PI/6, M_PI/6, M_PI/6;
-		// joint_task->_saturation_velocity = max_velocity;
-	}
 
 	VectorXd joint_task_torques = VectorXd::Zero(dof);
 	joint_task->setGains(400, 20, 20);
@@ -206,7 +122,7 @@ int main() {
 	std::vector<Vector6d> bias_measurement_vector;
 	Vector6d bias_measurement = Vector6d::Zero();  // averaged bias measurement at the end
 	Vector6d bias_sum = Vector6d::Zero();  // bias sum at one configuration 
-	Vector6d force_moment_reading;  // get from force sensor 	
+	Vector6d force_moment_reading;
 	double load_mass;
 	int n_measurements = 5 * 1000;  // 5 seconds measurement
 	int wait_count = 3 * 1000;  // 2 second wait before starting measurement after reaching goal configuration 
@@ -215,9 +131,11 @@ int main() {
 	bool integrator_reset = false;
 
 	// create a timer
-	Sai2Common::LoopTimer timer(1000, 1e6);
+	SaiCommon::LoopTimer timer(1000, 1e6);
 	double start_time = timer.elapsedTime(); //secs
 	int transient_count = 0;
+
+	std::cout << "Made it to the while loop!" << std::endl;
 
 	while (runloop) 
 	{
@@ -230,7 +148,7 @@ int main() {
 		robot->setDq(redis_client.getEigen(JOINT_VELOCITIES_KEY));
 
 		if (!flag_simulation) {
-			MatrixXd M = redis_client.getEigen(MASSMATRIX_KEY);
+			MatrixXd M = redis_client.getEigen(MASS_MATRIX);
 			
 			if (inertia_regularization)	{
 				M(4, 4) += 0.25;
@@ -242,7 +160,7 @@ int main() {
 			robot->updateModel();
 		}
 
-		force_moment_reading = redis_client.getEigen(FORCE_SENSOR_KEY);
+		force_moment_reading = redis_client.getEigen(FORCE_TORQUE_KEY);
 
 		if (state == POSTURE) {
 			// Update posture 
@@ -351,7 +269,7 @@ int main() {
 	// Verify
 	Vector3d p_load = robot->rotation("link7").transpose() * Vector3d(0, 0, -9.81) * load_mass;
 	Vector3d m_load = r_com.cross(p_load);
-	VectorXd calibrated_force_moment = redis_client.getEigen(FORCE_SENSOR_KEY) - bias_measurement;
+	VectorXd calibrated_force_moment = redis_client.getEigen(FORCE_TORQUE_KEY) - bias_measurement;
 	calibrated_force_moment.head(3) += p_load;
 	calibrated_force_moment.tail(3) += m_load;
 	std::cout << "Calibrated force moment reading: " << calibrated_force_moment.transpose() << "\n";
@@ -375,6 +293,8 @@ void writeXml(const string& file_name, const double& mass, const Vector3d& com, 
 	}
 
 	cout << "Writing mass and bias to file " << file_name << endl;
+
+	std::cout << "Going to write file to: " << file_name << std::endl;
 
 	ofstream file;
 	file.open(file_name);
